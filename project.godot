@@ -1,0 +1,31 @@
+; Engine configuration file.
+; Wells & Tents — Ch1 Steady the fold vertical slice (Godot 4.3)
+
+config_version=5
+
+[application]
+
+config/name="Wells & Tents — Ch1"
+config/description="FoldMap assign → walk → work → fail-capable sim. Bondservant-shepherd stewardship."
+run/main_scene="res://scenes/Main.tscn"
+config/features=PackedStringArray("4.3", "Forward Plus")
+config/icon="res://art/wells_tents/bump-sheep.png"
+
+[autoload]
+
+GameSim="*res://scripts/GameSim.gd"
+
+[display]
+
+window/size/viewport_width=390
+window/size/viewport_height=844
+window/size/window_width_override=390
+window/size/window_height_override=844
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep_width"
+window/handheld/orientation=1
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+textures/canvas_textures/default_texture_filter=0
