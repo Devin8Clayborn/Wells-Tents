@@ -20,14 +20,14 @@ Others are builder/spec sheets — implement with nodes + simple sprites matchin
 ## Required states & timing
 
 ```
-Idle  →  Walk (~1.0s)  →  Busy (visible on map)  →  THEN MissionVideo  →  FoldMap
+Idle  →  Walk (1.1s, pose visible ≥0.8–1.2s)  →  Busy (hold ~0.85s on map)  →  THEN MissionVideo  →  FoldMap
 ```
 
 1. Player selects worker (Eliab / Micah / Tamar), then taps empty post.  
-2. Worker **Walk** ~1s from camp → post.  
-3. Switch to **Busy** at post (glow ring). **Busy must paint before video opens.**  
-4. Open MissionVideo (bg + title/subtitle Labels + Continue).  
-5. On Continue: apply chrome deltas **and** terrain bump, return FoldMap.  
+2. Worker **Walk** 1.1s from camp → post. Silhouette is a deep lean and wide stride, not an Idle clone.  
+3. Switch to **Busy** at post (glow). **Busy holds ~0.85s and must paint before video opens.**  
+4. Success deltas and the terrain bump land on Busy→complete, then MissionVideo opens (bg + title/subtitle Labels + Continue).  
+5. Continue returns to FoldMap only — it does **not** apply resource deltas.  
 6. Post stays done/busy-complete; worker may remain or return Idle per design — map + chrome stay honest.
 
 ## Chrome binding rule

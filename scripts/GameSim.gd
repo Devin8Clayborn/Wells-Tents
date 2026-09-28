@@ -16,7 +16,10 @@ signal status_message(text: String)
 
 const MAX_DAYS := 5
 const MAX_SUCCESS_PER_DAY := 2
-const WALK_SECONDS := 1.0
+## Presentation timing only — Success/Neglect tables do not use these.
+## Walk pose must stay on screen ≥0.8s (sheet band 0.8–1.2s).
+const WALK_SECONDS := 1.1
+const BUSY_HOLD_SECONDS := 0.85
 
 const START := {"heads": 40, "health": 50, "trust": 40, "stores": 128}
 
@@ -152,14 +155,15 @@ func try_assign_post(post_id: String) -> bool:
 	return true
 
 
-## Called by FoldMap after ~1s walk tween.
+## FoldMap calls this when the walk tween finishes.
+## Busy paints and holds, then Success deltas and MissionVideo — not on Continue.
 func complete_walk(worker_id: String) -> void:
 	if workers[worker_id]["state"] != "walk":
 		return
 	workers[worker_id]["state"] = "busy"
 	worker_state_changed.emit(worker_id, "busy")
-	# Brief beat so Busy paints before deltas / video.
-	await get_tree().create_timer(0.35).timeout
+	# Hold Busy on the map so the beat reads before deltas / video.
+	await get_tree().create_timer(BUSY_HOLD_SECONDS).timeout
 	_apply_success(worker_id)
 
 

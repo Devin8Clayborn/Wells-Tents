@@ -14,6 +14,8 @@ func _init() -> void:
 	failed += _check("illegal all-3 same day blocked in static path", _expect_cap_enforced())
 	failed += _check("success table exact (Continue never applies these)", _expect_success_table())
 	failed += _check("neglect table exact", _expect_neglect_table())
+	failed += _check("walk seconds stay readable (presentation)", _expect_walk_timing())
+	failed += _check("busy hold before video (presentation)", _expect_busy_hold_timing())
 
 	if failed == 0:
 		print("PASS: all Ch1 sim exit-gate checks")
@@ -125,3 +127,11 @@ func _expect_neglect_table() -> bool:
 	if t != {"heads": 40, "health": 50, "trust": 39, "stores": 113}:
 		return false
 	return true
+
+
+func _expect_walk_timing() -> bool:
+	return Sim.WALK_SECONDS >= 0.8 and Sim.WALK_SECONDS <= 1.2
+
+
+func _expect_busy_hold_timing() -> bool:
+	return Sim.BUSY_HOLD_SECONDS >= 0.7 and Sim.BUSY_HOLD_SECONDS <= 1.0
