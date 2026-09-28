@@ -17,7 +17,8 @@ signal status_message(text: String)
 const MAX_DAYS := 5
 const MAX_SUCCESS_PER_DAY := 2
 ## Presentation timing only — Success/Neglect tables do not use these.
-const WALK_SECONDS := 1.8
+## Walk pose must stay on screen ≥0.8s (sheet band 0.8–1.2s).
+const WALK_SECONDS := 1.1
 const BUSY_HOLD_SECONDS := 0.85
 
 const START := {"heads": 40, "health": 50, "trust": 40, "stores": 128}

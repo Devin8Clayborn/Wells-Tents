@@ -130,7 +130,7 @@ func _expect_neglect_table() -> bool:
 
 
 func _expect_walk_timing() -> bool:
-	return Sim.WALK_SECONDS >= 1.6 and Sim.WALK_SECONDS <= 2.0
+	return Sim.WALK_SECONDS >= 0.8 and Sim.WALK_SECONDS <= 1.2
 
 
 func _expect_busy_hold_timing() -> bool:

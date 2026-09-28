@@ -32,13 +32,15 @@ var mission_video: Control
 var outcome_card: Control
 var walk_tweens: Dictionary = {}
 var sway_nodes: Array[Node2D] = []
-var neglect_banner: Panel
-var neglect_title: Label
-var neglect_detail: Label
-var neglect_cost: Label
+var neglect_chip: Panel
+var neglect_chip_label: Label
 var neglect_drama_post: String = ""
 var neglect_serial: int = 0
 var neglect_pulse: Tween
+var chrome_meters: Dictionary = {}
+var chrome_flash_tweens: Array[Tween] = []
+var zone_roots: Dictionary = {}
+var living_bumps: Dictionary = {}
 
 func _ready() -> void:
 	set_anchors_preset(PRESET_FULL_RECT)
@@ -224,22 +226,9 @@ func _build_camp_props() -> void:
 		_tuft(sc, spot, Color(0.45, 0.58, 0.28, 0.9))
 		_tuft(sc, spot + Vector2(10, 4), Color(0.32, 0.46, 0.22, 0.85))
 
-	_fence_box(sc, POST_POS["pasture"])
-	_fence_box(sc, POST_POS["yard"])
-
-	var well_at: Vector2 = POST_POS["well"]
-	_disc(sc, well_at + Vector2(0, 4), 24, Color(0.55, 0.52, 0.48, 0.95))
-	_disc(sc, well_at + Vector2(0, 6), 12, Color(0.18, 0.32, 0.34, 0.95))
-	_rect(sc, well_at + Vector2(-26, -28), Vector2(6, 32), Color(0.38, 0.26, 0.14))
-	_rect(sc, well_at + Vector2(20, -28), Vector2(6, 32), Color(0.38, 0.26, 0.14))
-	var roof := Polygon2D.new()
-	roof.polygon = PackedVector2Array([
-		well_at + Vector2(-32, -24),
-		well_at + Vector2(0, -46),
-		well_at + Vector2(32, -24),
-	])
-	roof.color = Color(0.55, 0.28, 0.16, 0.95)
-	sc.add_child(roof)
+	_build_pasture_zone(sc)
+	_build_well_zone(sc)
+	_build_yard_zone(sc)
 
 	_tent(sc, Vector2(78, 590), 34, 48, Color(0.62, 0.48, 0.3, 0.95))
 	_tent(sc, Vector2(330, 575), 30, 42, Color(0.5, 0.34, 0.22, 0.95))
@@ -250,6 +239,103 @@ func _build_camp_props() -> void:
 	# Foreground scrub so the camp sits in front of the field.
 	_disc(sc, Vector2(18, 648), 22, Color(0.2, 0.28, 0.14, 0.9))
 	_disc(sc, Vector2(372, 652), 24, Color(0.18, 0.26, 0.12, 0.9))
+
+
+func _zone(parent: Node, at: Vector2) -> Control:
+	var z := Control.new()
+	z.position = at
+	z.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(z)
+	return z
+
+
+func _sheep(parent: Node, at: Vector2) -> void:
+	_disc(parent, at, 12, Color(0.96, 0.94, 0.9, 0.98))
+	_disc(parent, at + Vector2(9, -1), 5, Color(0.93, 0.9, 0.84, 0.98))
+	_rect(parent, at + Vector2(-6, 7), Vector2(3, 6), Color(0.22, 0.16, 0.12, 0.95))
+	_rect(parent, at + Vector2(3, 7), Vector2(3, 6), Color(0.22, 0.16, 0.12, 0.95))
+
+
+func _peg(parent: Node, at: Vector2) -> void:
+	_rect(parent, at, Vector2(6, 13), Color(0.16, 0.12, 0.09, 0.95))
+	_disc(parent, at + Vector2(3, -3), 3.4, Color(0.16, 0.12, 0.09, 0.95))
+
+
+func _build_pasture_zone(parent: Node) -> void:
+	var z := _zone(parent, POST_POS["pasture"])
+	zone_roots["pasture"] = z
+	_disc(z, Vector2(0, 6), 50, Color(0.42, 0.62, 0.36, 0.92))
+	_disc(z, Vector2(-8, 10), 28, Color(0.5, 0.7, 0.4, 0.55))
+	var wood := Color(0.38, 0.26, 0.14, 0.95)
+	_rect(z, Vector2(-54, -40), Vector2(108, 4), wood)
+	_rect(z, Vector2(-54, 36), Vector2(108, 4), wood)
+	_rect(z, Vector2(-54, -40), Vector2(4, 80), wood)
+	_rect(z, Vector2(50, -40), Vector2(4, 80), wood)
+	for i in 5:
+		_rect(z, Vector2(-46 + i * 20, -44), Vector2(4, 10), wood)
+	for spot in [Vector2(-30, 18), Vector2(8, 22), Vector2(28, 8), Vector2(-8, -6)]:
+		_tuft(z, spot, Color(0.28, 0.48, 0.24, 0.9))
+	var flock := Control.new()
+	flock.name = "Flock"
+	flock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flock.visible = false
+	z.add_child(flock)
+	_sheep(flock, Vector2(-22, -4))
+	_sheep(flock, Vector2(4, -12))
+	_sheep(flock, Vector2(24, 6))
+	_sheep(flock, Vector2(-4, 14))
+	living_bumps["pasture"] = flock
+
+
+func _build_well_zone(parent: Node) -> void:
+	var z := _zone(parent, POST_POS["well"])
+	zone_roots["well"] = z
+	var stone := Color(0.62, 0.64, 0.66, 0.96)
+	_rect(z, Vector2(-26, -8), Vector2(52, 34), stone)
+	_disc(z, Vector2(0, 8), 16, Color(0.16, 0.32, 0.36, 0.98))
+	_rect(z, Vector2(-30, -22), Vector2(5, 30), Color(0.42, 0.28, 0.14))
+	_rect(z, Vector2(25, -22), Vector2(5, 30), Color(0.42, 0.28, 0.14))
+	var roof := Polygon2D.new()
+	roof.polygon = PackedVector2Array([Vector2(-34, -16), Vector2(0, -40), Vector2(34, -16)])
+	roof.color = Color(0.54, 0.32, 0.16, 0.96)
+	z.add_child(roof)
+	_rect(z, Vector2(-28, -18), Vector2(56, 4), Color(0.4, 0.24, 0.12))
+	_rect(z, Vector2(18, -2), Vector2(10, 12), Color(0.77, 0.42, 0.23, 0.95))
+	var crowd := Control.new()
+	crowd.name = "Crowd"
+	crowd.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	crowd.visible = false
+	z.add_child(crowd)
+	for i in 4:
+		_peg(crowd, Vector2(-22 + i * 12, 22))
+	living_bumps["well"] = crowd
+
+
+func _build_yard_zone(parent: Node) -> void:
+	var z := _zone(parent, POST_POS["yard"])
+	zone_roots["yard"] = z
+	_disc(z, Vector2(0, 8), 48, Color(0.62, 0.5, 0.32, 0.9))
+	var wood := Color(0.42, 0.3, 0.16, 0.95)
+	_rect(z, Vector2(-50, -36), Vector2(100, 4), wood)
+	_rect(z, Vector2(-50, 34), Vector2(100, 4), wood)
+	_rect(z, Vector2(-50, -36), Vector2(4, 74), wood)
+	_rect(z, Vector2(46, -36), Vector2(4, 74), wood)
+	_rect(z, Vector2(-2, -30), Vector2(4, 60), wood)
+	_disc(z, Vector2(28, -18), 10, Color(0.78, 0.64, 0.28, 0.9))
+	var stores := Control.new()
+	stores.name = "Stores"
+	stores.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stores.visible = false
+	z.add_child(stores)
+	var crate := Color(0.55, 0.34, 0.16, 0.98)
+	var edge := Color(0.35, 0.2, 0.1, 0.98)
+	for box in [Vector2(-28, 8), Vector2(-14, -2), Vector2(-22, -16)]:
+		_rect(stores, box, Vector2(16, 13), crate)
+		_rect(stores, box + Vector2(0, 0), Vector2(16, 3), edge)
+	for coin_at in [Vector2(14, 10), Vector2(26, 2), Vector2(18, -8)]:
+		_disc(stores, coin_at, 6, Color(0.93, 0.78, 0.32, 0.98))
+		_disc(stores, coin_at, 3, Color(0.98, 0.9, 0.55, 0.9))
+	living_bumps["yard"] = stores
 
 
 func _sway_tufts() -> void:
@@ -286,10 +372,25 @@ func _build_posts() -> void:
 		var ash := ColorRect.new()
 		ash.name = "Ash"
 		ash.set_anchors_preset(PRESET_FULL_RECT)
-		ash.color = Color(0.12, 0.07, 0.05, 0.45)
+		ash.color = Color(0.2, 0.14, 0.1, 0.28)
 		ash.visible = false
 		ash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		wrap.add_child(ash)
+
+		var crack_a := Line2D.new()
+		crack_a.name = "CrackA"
+		crack_a.points = PackedVector2Array([Vector2(18, 22), Vector2(46, 50), Vector2(40, 78)])
+		crack_a.width = 3.0
+		crack_a.default_color = Color(0.22, 0.12, 0.08, 0.92)
+		crack_a.visible = false
+		wrap.add_child(crack_a)
+		var crack_b := Line2D.new()
+		crack_b.name = "CrackB"
+		crack_b.points = PackedVector2Array([Vector2(70, 28), Vector2(52, 48), Vector2(74, 70)])
+		crack_b.width = 2.5
+		crack_b.default_color = Color(0.28, 0.16, 0.1, 0.88)
+		crack_b.visible = false
+		wrap.add_child(crack_b)
 
 		var label := Label.new()
 		label.name = "Label"
@@ -351,15 +452,25 @@ func _build_workers() -> void:
 	workers.name = "Workers"
 	map_layer.add_child(workers)
 	var tex := {
-		"idle": load("res://art/wells_tents/worker-idle.png"),
-		"walk": load("res://art/wells_tents/worker-walk.png"),
-		"busy": load("res://art/wells_tents/worker-busy.png"),
+		"idle": load("res://art/wells_tents/polish/worker-idle-pose.png"),
+		"walk": load("res://art/wells_tents/polish/worker-walk-pose.png"),
+		"busy": load("res://art/wells_tents/polish/worker-busy-pose.png"),
+	}
+	var pose_box := {
+		"idle": Vector2(58, 108),
+		"walk": Vector2(92, 108),
+		"busy": Vector2(70, 108),
+	}
+	var pose_at := {
+		"idle": Vector2(16, 4),
+		"walk": Vector2(-2, 4),
+		"busy": Vector2(8, 4),
 	}
 	for i in GameSim.WORKER_ORDER.size():
 		var id: String = GameSim.WORKER_ORDER[i]
 		var wrap := Control.new()
 		wrap.name = id
-		wrap.size = Vector2(72, 100)
+		wrap.size = Vector2(88, 124)
 		wrap.position = CAMP + Vector2((i - 1) * 58.0, i * 6.0)
 		wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		workers.add_child(wrap)
@@ -379,16 +490,30 @@ func _build_workers() -> void:
 			tr.texture = tex[state]
 			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			tr.size = Vector2(64, 86)
-			tr.position = Vector2(4, 0)
+			tr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			tr.size = pose_box[state]
+			tr.position = pose_at[state]
 			tr.modulate = GameSim.WORKER_TINTS[id]
 			tr.visible = state == "idle"
 			tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			wrap.add_child(tr)
 
+		var ticks := Control.new()
+		ticks.name = "WalkTicks"
+		ticks.visible = false
+		ticks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		wrap.add_child(ticks)
+		for tick_i in 4:
+			var tick := ColorRect.new()
+			tick.position = Vector2(0, 28 + tick_i * 12)
+			tick.size = Vector2(14 - (tick_i % 2) * 4, 2)
+			tick.color = Color(0.16, 0.12, 0.08, 0.55)
+			tick.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			ticks.add_child(tick)
+
 		var label := Label.new()
 		label.name = "Label"
-		label.position = Vector2(-20, 84)
+		label.position = Vector2(-16, 108)
 		label.size = Vector2(110, 18)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.add_theme_font_size_override("font_size", 11)
@@ -433,6 +558,7 @@ func _build_chrome() -> void:
 		cell.add_child(value)
 		truths.add_child(cell)
 		chrome_truths[key] = value
+		chrome_meters[key] = cell
 
 	var row := HBoxContainer.new()
 	row.position = Vector2(12, 42)
@@ -444,6 +570,7 @@ func _build_chrome() -> void:
 	stores_label.add_theme_color_override("font_color", INK)
 	stores_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(stores_label)
+	chrome_meters["stores"] = stores_label
 	day_label = Label.new()
 	day_label.text = "Day 1/5"
 	day_label.add_theme_font_size_override("font_size", 13)
@@ -516,40 +643,24 @@ func _build_goal_and_tray() -> void:
 
 
 func _build_neglect_banner() -> void:
-	neglect_banner = Panel.new()
-	neglect_banner.name = "NeglectBanner"
-	neglect_banner.position = Vector2(10, 452)
-	neglect_banner.size = Vector2(370, 78)
-	neglect_banner.visible = false
-	neglect_banner.z_index = 8
-	neglect_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	neglect_banner.add_theme_stylebox_override("panel", _style_flat(Color(0.32, 0.13, 0.08, 0.94), Color(0.86, 0.42, 0.24), 12, 2))
-	add_child(neglect_banner)
-
-	neglect_title = Label.new()
-	neglect_title.position = Vector2(12, 6)
-	neglect_title.size = Vector2(346, 18)
-	neglect_title.text = "NEGLECT"
-	neglect_title.add_theme_font_size_override("font_size", 12)
-	neglect_title.add_theme_color_override("font_color", Color(0.98, 0.82, 0.62))
-	neglect_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	neglect_banner.add_child(neglect_title)
-
-	neglect_detail = Label.new()
-	neglect_detail.position = Vector2(12, 24)
-	neglect_detail.size = Vector2(346, 22)
-	neglect_detail.add_theme_font_size_override("font_size", 16)
-	neglect_detail.add_theme_color_override("font_color", CREAM)
-	neglect_detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	neglect_banner.add_child(neglect_detail)
-
-	neglect_cost = Label.new()
-	neglect_cost.position = Vector2(12, 48)
-	neglect_cost.size = Vector2(346, 22)
-	neglect_cost.add_theme_font_size_override("font_size", 14)
-	neglect_cost.add_theme_color_override("font_color", Color(0.98, 0.78, 0.55))
-	neglect_cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	neglect_banner.add_child(neglect_cost)
+	# One-line on-map chip. neglect-dayroll.png is the builder ref, not a screen.
+	neglect_chip = Panel.new()
+	neglect_chip.name = "NeglectChip"
+	neglect_chip.position = Vector2(28, 468)
+	neglect_chip.size = Vector2(334, 32)
+	neglect_chip.visible = false
+	neglect_chip.z_index = 8
+	neglect_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	neglect_chip.add_theme_stylebox_override("panel", _style_flat(Color(0.17, 0.14, 0.1, 0.94), TERRACOTTA, 10, 2))
+	add_child(neglect_chip)
+	neglect_chip_label = Label.new()
+	neglect_chip_label.set_anchors_preset(PRESET_FULL_RECT)
+	neglect_chip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	neglect_chip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	neglect_chip_label.add_theme_font_size_override("font_size", 13)
+	neglect_chip_label.add_theme_color_override("font_color", CREAM)
+	neglect_chip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	neglect_chip.add_child(neglect_chip_label)
 
 
 func _build_mission_video() -> void:
@@ -744,6 +855,7 @@ func _on_worker_state(worker_id: String, state: String) -> void:
 	var was_busy := bool(node.get_node("Busy").visible)
 	node.get_node("Busy").visible = state == "busy"
 	node.get_node("BusyGlow").visible = state == "busy"
+	node.get_node("WalkTicks").visible = state == "walk"
 	node.get_node("Label").text = "%s · %s" % [GameSim.WORKER_NAMES[worker_id], state.capitalize()]
 	_refresh_tray()
 	if state == "idle":
@@ -761,39 +873,49 @@ func _place_worker(worker_id: String) -> void:
 		var idx := GameSim.WORKER_ORDER.find(worker_id)
 		node.position = CAMP + Vector2((idx - 1) * 58.0, idx * 6.0)
 	elif w["post"] != "" and w["state"] != "walk":
-		node.position = POST_POS[w["post"]] + Vector2(-28, -30)
+		node.position = POST_POS[w["post"]] + Vector2(-28, -36)
 
 
 func _on_assignment(worker_id: String, post_id: String) -> void:
-	_end_neglect_drama()
+	_hide_neglect_chip()
+	_stop_chrome_flash()
+	if neglect_drama_post == post_id:
+		_clear_neglect_post(post_id)
 	_refresh_post(post_id)
 	var node: Control = worker_nodes[worker_id]
 	_kill_tween(worker_id)
 	_kill_tween(worker_id + "_stride")
-	node.pivot_offset = Vector2(36, 90)
-	var target: Vector2 = POST_POS[post_id] + Vector2(-28, -30)
+	node.rotation_degrees = 0.0
+	var target: Vector2 = POST_POS[post_id] + Vector2(-28, -36)
 	var from_pos := node.position
 	var dur := GameSim.WALK_SECONDS
 	var tw := create_tween()
 	walk_tweens[worker_id] = tw
 	tw.tween_property(node, "position", target, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_callback(func() -> void:
-		node.rotation_degrees = 0.0
 		_kill_tween(worker_id + "_stride")
+		var walk_sprite: Control = node.get_node("Walk")
+		walk_sprite.position = Vector2(-2, 4)
 		GameSim.complete_walk(worker_id)
 	)
+	# Pose already leans. Bob the sprite so the stride reads without tumbling the silhouette.
+	var walk_sprite: Control = node.get_node("Walk")
 	var stride := create_tween()
 	walk_tweens[worker_id + "_stride"] = stride
-	stride.set_loops(ceili(dur / 0.32))
-	stride.tween_property(node, "rotation_degrees", 7.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	stride.tween_property(node, "rotation_degrees", -5.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	stride.set_loops(ceili(dur / 0.28))
+	stride.tween_property(walk_sprite, "position:y", 0.0, 0.14).set_trans(Tween.TRANS_SINE)
+	stride.tween_property(walk_sprite, "position:y", 6.0, 0.14).set_trans(Tween.TRANS_SINE)
 	_spawn_walk_dust(from_pos, target)
 
 
 func _on_terrain(post_id: String) -> void:
-	_pop_bump(bump_nodes[post_id], Vector2.ONE)
-	_pop_bump(bump_nodes[post_id + "_a"], Vector2(0.92, 0.92))
-	_pop_bump(bump_nodes[post_id + "_b"], Vector2(0.8, 0.8))
+	_set_bumps_visible(post_id, true)
+	if living_bumps.has(post_id):
+		var flock: Control = living_bumps[post_id]
+		flock.scale = Vector2(0.4, 0.4)
+		flock.pivot_offset = Vector2(0, 10)
+		var tw := create_tween()
+		tw.tween_property(flock, "scale", Vector2.ONE, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _pop_bump(n: Control, target: Vector2) -> void:
@@ -812,10 +934,15 @@ func _refresh_post(post_id: String) -> void:
 	var short: String = {"pasture": "North", "well": "Well", "yard": "Fold"}[post_id]
 	if neglect_drama_post == post_id:
 		ash.visible = true
-		ring.add_theme_stylebox_override("panel", _style_flat(Color(0.28, 0.12, 0.08, 0.62), Color(0.72, 0.24, 0.14), 48, 4))
+		node.get_node("CrackA").visible = true
+		node.get_node("CrackB").visible = true
+		_grey_zone(post_id, true)
+		ring.add_theme_stylebox_override("panel", _style_flat(Color(0.28, 0.2, 0.14, 0.5), Color(0.42, 0.28, 0.18), 48, 3))
 		label.text = "%s · Neglected" % short
 		return
 	ash.visible = false
+	node.get_node("CrackA").visible = false
+	node.get_node("CrackB").visible = false
 	node.modulate = Color.WHITE
 	if node.scale != Vector2.ONE and neglect_drama_post == "":
 		node.scale = Vector2.ONE
@@ -907,9 +1034,14 @@ func _show_outcome(kind: String, title: String, tip: String) -> void:
 
 
 func _set_bumps_visible(post_id: String, on: bool) -> void:
+	# Flat bump sheets stay off. Living props carry the chrome sync.
 	for key in [post_id, post_id + "_a", post_id + "_b"]:
-		var n: CanvasItem = bump_nodes[key]
-		n.visible = on
+		if bump_nodes.has(key):
+			var n: CanvasItem = bump_nodes[key]
+			n.visible = false
+	if living_bumps.has(post_id):
+		var flock: CanvasItem = living_bumps[post_id]
+		flock.visible = on
 
 
 func _kill_tween(key: String) -> void:
@@ -949,50 +1081,68 @@ func _show_busy_hold(worker_id: String) -> void:
 	tw.parallel().tween_property(glow, "modulate:a", 0.45, 0.14)
 
 
-## Presentation only. Costs are read from GameSim.NEGLECT; this does not apply deltas.
-func _neglect_cost_line(post_id: String) -> String:
-	var delta: Dictionary = GameSim.NEGLECT[post_id]
-	var parts: PackedStringArray = []
-	var names := {"heads": "Heads", "health": "Health", "trust": "Trust", "stores": "Stores"}
-	for key in ["heads", "health", "trust", "stores"]:
-		var n := int(delta[key])
-		if n == 0:
-			continue
-		parts.append("%s %d" % [names[key], n])
-	return " · ".join(parts)
+## Wilt, chip, and chrome flash in the same beat as neglect_applied. No deltas here.
+const NEGLECT_FLASH := {
+	"pasture": ["heads", "health"],
+	"well": ["health", "trust"],
+	"yard": ["trust", "stores"],
+}
 
 
 func _on_neglect_applied(post_id: String, _truths: Dictionary) -> void:
 	neglect_serial += 1
 	neglect_drama_post = post_id
-	var serial := neglect_serial
-	call_deferred("_present_neglect", post_id, serial)
-
-
-func _present_neglect(post_id: String, serial: int) -> void:
-	if serial != neglect_serial:
-		return
-	var place: String = GameSim.POST_LABELS[post_id]
-	var cost := _neglect_cost_line(post_id)
-	neglect_detail.text = "%s untended" % place
-	neglect_cost.text = cost
-	neglect_banner.modulate.a = 1.0
-	neglect_banner.visible = true
-	status_label.text = "Neglect: %s — %s" % [place, cost]
+	var line := "Neglect: %s untended" % GameSim.POST_LABELS[post_id]
+	neglect_chip_label.text = line
+	neglect_chip.modulate = Color.WHITE
+	neglect_chip.visible = true
+	status_label.text = line
 	_refresh_post(post_id)
+	_flash_chrome(post_id)
 	_pulse_neglected(post_id)
-	await get_tree().create_timer(3.4).timeout
-	if serial != neglect_serial:
+	var serial := neglect_serial
+	var chip_tw := create_tween()
+	chip_tw.set_loops(3)
+	chip_tw.tween_property(neglect_chip, "modulate", Color(1.2, 0.82, 0.62), 0.45)
+	chip_tw.tween_property(neglect_chip, "modulate", Color.WHITE, 0.45)
+	chip_tw.finished.connect(func() -> void:
+		if serial == neglect_serial and neglect_chip.visible:
+			neglect_chip.modulate = Color.WHITE
+	)
+
+
+func _flash_chrome(post_id: String) -> void:
+	_stop_chrome_flash()
+	var keys: Array = NEGLECT_FLASH[post_id]
+	for key in keys:
+		var meter: CanvasItem = chrome_meters[key]
+		var tw := create_tween()
+		chrome_flash_tweens.append(tw)
+		tw.set_loops(3)
+		tw.tween_property(meter, "modulate", Color(1.28, 0.62, 0.4), 0.45).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(meter, "modulate", Color(1.0, 0.9, 0.82), 0.45).set_trans(Tween.TRANS_SINE)
+		var captured := meter
+		tw.finished.connect(func() -> void:
+			if is_instance_valid(captured):
+				captured.modulate = Color.WHITE
+		)
+
+
+func _stop_chrome_flash() -> void:
+	for tw in chrome_flash_tweens:
+		if tw and is_instance_valid(tw):
+			tw.kill()
+	chrome_flash_tweens.clear()
+	for key in chrome_meters.keys():
+		var meter: CanvasItem = chrome_meters[key]
+		meter.modulate = Color.WHITE
+
+
+func _grey_zone(post_id: String, on: bool) -> void:
+	if not zone_roots.has(post_id):
 		return
-	if neglect_pulse and is_instance_valid(neglect_pulse):
-		neglect_pulse.kill()
-	_hide_neglect_banner()
-	if neglect_drama_post == post_id:
-		neglect_drama_post = ""
-		var node: Control = post_nodes[post_id]
-		node.modulate = Color.WHITE
-		node.scale = Vector2.ONE
-		_refresh_post(post_id)
+	var zone: CanvasItem = zone_roots[post_id]
+	zone.modulate = Color(0.62, 0.58, 0.52) if on else Color.WHITE
 
 
 func _pulse_neglected(post_id: String) -> void:
@@ -1000,40 +1150,46 @@ func _pulse_neglected(post_id: String) -> void:
 	node.pivot_offset = node.size * 0.5
 	if neglect_pulse and is_instance_valid(neglect_pulse):
 		neglect_pulse.kill()
+	var settle := Color(0.72, 0.67, 0.6)
 	var tw := create_tween()
 	neglect_pulse = tw
-	tw.set_loops(4)
-	tw.tween_property(node, "scale", Vector2(1.08, 1.08), 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.parallel().tween_property(node, "modulate", Color(1.15, 0.7, 0.48), 0.28)
-	tw.tween_property(node, "scale", Vector2(0.96, 0.96), 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.parallel().tween_property(node, "modulate", Color(0.52, 0.42, 0.38), 0.28)
-
-
-func _hide_neglect_banner() -> void:
-	if neglect_banner == null or not neglect_banner.visible:
-		return
-	var tw := create_tween()
-	tw.tween_property(neglect_banner, "modulate:a", 0.0, 0.35)
-	tw.tween_callback(func() -> void:
-		neglect_banner.visible = false
-		neglect_banner.modulate.a = 1.0
+	tw.set_loops(3)
+	tw.tween_property(node, "modulate", Color(1.05, 0.78, 0.58), 0.45).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(node, "modulate", settle, 0.45).set_trans(Tween.TRANS_SINE)
+	tw.finished.connect(func() -> void:
+		if neglect_drama_post == post_id and is_instance_valid(node):
+			node.modulate = settle
+			node.scale = Vector2.ONE
 	)
+
+
+func _hide_neglect_chip() -> void:
+	if neglect_chip == null:
+		return
+	neglect_chip.visible = false
+	neglect_chip.modulate = Color.WHITE
+
+
+func _clear_neglect_post(post_id: String) -> void:
+	if neglect_drama_post == post_id:
+		neglect_drama_post = ""
+	if neglect_pulse and is_instance_valid(neglect_pulse):
+		neglect_pulse.kill()
+	neglect_pulse = null
+	_grey_zone(post_id, false)
+	if post_nodes.has(post_id):
+		var node: Control = post_nodes[post_id]
+		node.modulate = Color.WHITE
+		node.scale = Vector2.ONE
 
 
 func _end_neglect_drama() -> void:
 	neglect_serial += 1
 	var post := neglect_drama_post
-	neglect_drama_post = ""
-	if neglect_pulse and is_instance_valid(neglect_pulse):
-		neglect_pulse.kill()
-	neglect_pulse = null
-	if neglect_banner:
-		neglect_banner.visible = false
-		neglect_banner.modulate.a = 1.0
-	if post != "" and post_nodes.has(post):
-		var node: Control = post_nodes[post]
-		node.modulate = Color.WHITE
-		node.scale = Vector2.ONE
+	_hide_neglect_chip()
+	_stop_chrome_flash()
+	if post != "":
+		_clear_neglect_post(post)
 		_refresh_post(post)
 
 

@@ -11,8 +11,8 @@ From the project folder (Godot CLI if installed):
 Agent reported these **PASS**.
 
 ## Loop to verify (Tester bar)
-- Assign ≤2 workers/Day → Idle → Walk (~1.8s) → Busy (hold ~0.85s) → Success deltas on complete → then MissionVideo
-- Unstaffed post Neglects at Day end (banner + pulse are presentation; tables unchanged)
+- Assign ≤2 workers/Day → Idle → Walk (1.1s, lean pose) → Busy (hold ~0.85s) → Success deltas on complete → then MissionVideo
+- Unstaffed post Neglects at Day end (wilt + one-line chip + chrome flash are presentation; tables unchanged)
 - Win: Health≥55, Trust≥45, Heads≥35, Stores>0
 - Hard lose: Stores≤0 / Heads<30 / Trust≤20
 - Continue never applies deltas
