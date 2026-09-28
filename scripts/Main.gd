@@ -31,6 +31,14 @@ var bump_nodes: Dictionary = {}
 var mission_video: Control
 var outcome_card: Control
 var walk_tweens: Dictionary = {}
+var sway_nodes: Array[Node2D] = []
+var neglect_banner: Panel
+var neglect_title: Label
+var neglect_detail: Label
+var neglect_cost: Label
+var neglect_drama_post: String = ""
+var neglect_serial: int = 0
+var neglect_pulse: Tween
 
 func _ready() -> void:
 	set_anchors_preset(PRESET_FULL_RECT)
@@ -40,18 +48,36 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	# Root phone frame
-	var bg := ColorRect.new()
-	bg.set_anchors_preset(PRESET_FULL_RECT)
-	bg.color = Color("5f7d58")
-	add_child(bg)
+	# Layout sheet as the ground plate (baked chrome is masked; assign stays on our nodes).
+	var plate := TextureRect.new()
+	plate.name = "FoldPlate"
+	plate.set_anchors_preset(PRESET_FULL_RECT)
+	plate.texture = load("res://art/wells_tents/foldmap-phone-layout.png")
+	plate.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	plate.stretch_mode = TextureRect.STRETCH_SCALE
+	plate.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(plate)
 
-	# Soft path wash
-	var path := ColorRect.new()
-	path.position = Vector2(40, 160)
-	path.size = Vector2(310, 420)
-	path.color = Color(0.55, 0.45, 0.32, 0.35)
-	add_child(path)
+	var veil := ColorRect.new()
+	veil.set_anchors_preset(PRESET_FULL_RECT)
+	veil.color = Color(0.16, 0.22, 0.11, 0.22)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(veil)
+
+	var top_mask := ColorRect.new()
+	top_mask.position = Vector2.ZERO
+	top_mask.size = Vector2(W, 96)
+	top_mask.color = Color(0.32, 0.4, 0.24, 0.94)
+	top_mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(top_mask)
+
+	var bottom_mask := ColorRect.new()
+	bottom_mask.position = Vector2(0, 668)
+	bottom_mask.size = Vector2(W, H - 668)
+	bottom_mask.color = Color(0.15, 0.13, 0.1, 0.94)
+	bottom_mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bottom_mask)
 
 	map_layer = Control.new()
 	map_layer.name = "MapLayer"
@@ -64,8 +90,10 @@ func _build_ui() -> void:
 	_build_workers()
 	_build_chrome()
 	_build_goal_and_tray()
+	_build_neglect_banner()
 	_build_mission_video()
 	_build_outcome_card()
+	_sway_tufts()
 
 
 func _style_flat(bg: Color, border: Color, radius: float = 12.0, bw: int = 0) -> StyleBoxFlat:
@@ -81,35 +109,158 @@ func _style_flat(bg: Color, border: Color, radius: float = 12.0, bw: int = 0) ->
 	return sb
 
 
+func _rect(parent: Node, at: Vector2, size: Vector2, color: Color) -> ColorRect:
+	var r := ColorRect.new()
+	r.position = at
+	r.size = size
+	r.color = color
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(r)
+	return r
+
+
+func _disc(parent: Node, at: Vector2, radius: float, color: Color, points: int = 14) -> Polygon2D:
+	var poly := Polygon2D.new()
+	var pts := PackedVector2Array()
+	for i in points:
+		var a := TAU * float(i) / float(points)
+		pts.append(Vector2(cos(a), sin(a)) * radius)
+	poly.polygon = pts
+	poly.color = color
+	poly.position = at
+	parent.add_child(poly)
+	return poly
+
+
+func _path_band(parent: Node, a: Vector2, b: Vector2, width: float, color: Color) -> void:
+	var delta := b - a
+	if delta.length() < 1.0:
+		return
+	var n := Vector2(-delta.y, delta.x).normalized() * width
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([a - n, a + n, b + n, b - n])
+	poly.color = color
+	parent.add_child(poly)
+
+
+func _tuft(parent: Node, at: Vector2, tint: Color) -> void:
+	var tuft := Polygon2D.new()
+	tuft.polygon = PackedVector2Array([
+		Vector2(-6, 7), Vector2(-2, -12), Vector2(0, 6),
+		Vector2(2, -14), Vector2(5, 7),
+	])
+	tuft.color = tint
+	tuft.position = at
+	parent.add_child(tuft)
+	sway_nodes.append(tuft)
+
+
+func _tent(parent: Node, base: Vector2, w: float, h: float, cloth: Color) -> void:
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([
+		base + Vector2(-w, 0),
+		base + Vector2(0, -h),
+		base + Vector2(w, 0),
+	])
+	poly.color = cloth
+	parent.add_child(poly)
+	var door := Polygon2D.new()
+	door.polygon = PackedVector2Array([
+		base + Vector2(-w * 0.22, 0),
+		base + Vector2(0, -h * 0.42),
+		base + Vector2(w * 0.22, 0),
+	])
+	door.color = Color(0.18, 0.12, 0.08, 0.85)
+	parent.add_child(door)
+
+
+func _fence_box(parent: Node, center: Vector2) -> void:
+	var wood := Color(0.45, 0.3, 0.16, 0.92)
+	var left := center + Vector2(-58, -36)
+	var right := center + Vector2(58, -36)
+	var top := center + Vector2(-58, -36)
+	var bot := center + Vector2(-58, 40)
+	_rect(parent, top, Vector2(116, 3), wood)
+	_rect(parent, bot, Vector2(116, 3), wood)
+	_rect(parent, left, Vector2(3, 76), wood)
+	_rect(parent, right, Vector2(3, 76), wood)
+	for i in 4:
+		_rect(parent, left + Vector2(28 * i, 0), Vector2(4, 76), Color(wood.r, wood.g, wood.b, 0.75))
+
+
 func _build_camp_props() -> void:
-	# Tent
-	var tent := Polygon2D.new()
-	tent.polygon = PackedVector2Array([Vector2(300, 500), Vector2(340, 430), Vector2(380, 500)])
-	tent.color = Color(0.45, 0.35, 0.22)
-	map_layer.add_child(tent)
-	# Rock
+	var sc := Control.new()
+	sc.name = "Scenery"
+	sc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sc.set_anchors_preset(PRESET_FULL_RECT)
+	map_layer.add_child(sc)
+
+	# Routes read camp → post even over the layout plate.
+	var dirt := Color(0.5, 0.36, 0.2, 0.42)
+	var track := Color(0.72, 0.58, 0.36, 0.28)
+	for pid in ["pasture", "well", "yard"]:
+		var end: Vector2 = POST_POS[pid]
+		_path_band(sc, CAMP, end, 16.0, dirt)
+		_path_band(sc, CAMP, end, 5.0, track)
+
+	# Edge shrubs and rocks — frame, not on the hotspots.
+	_disc(sc, Vector2(28, 150), 26, Color(0.28, 0.38, 0.2, 0.9))
+	_disc(sc, Vector2(52, 168), 16, Color(0.36, 0.46, 0.24, 0.85))
+	_disc(sc, Vector2(360, 168), 22, Color(0.26, 0.36, 0.18, 0.9))
+	_disc(sc, Vector2(24, 470), 18, Color(0.3, 0.4, 0.2, 0.8))
+	_disc(sc, Vector2(368, 500), 20, Color(0.27, 0.36, 0.18, 0.85))
 	var rock := Polygon2D.new()
-	rock.polygon = PackedVector2Array([Vector2(40, 300), Vector2(90, 270), Vector2(110, 320), Vector2(50, 340)])
-	rock.color = Color(0.45, 0.42, 0.38)
-	map_layer.add_child(rock)
-	# Well visual
-	var well := ColorRect.new()
-	well.position = POST_POS["well"] + Vector2(-18, -28)
-	well.size = Vector2(36, 28)
-	well.color = Color(0.55, 0.55, 0.58)
-	map_layer.add_child(well)
-	var well_roof := ColorRect.new()
-	well_roof.position = POST_POS["well"] + Vector2(-22, -40)
-	well_roof.size = Vector2(44, 12)
-	well_roof.color = Color(0.4, 0.28, 0.18)
-	map_layer.add_child(well_roof)
-	# Fence hints pasture / yard
-	for p in [POST_POS["pasture"], POST_POS["yard"]]:
-		var fence := ColorRect.new()
-		fence.position = p + Vector2(-55, -45)
-		fence.size = Vector2(110, 90)
-		fence.color = Color(0.55, 0.42, 0.25, 0.25)
-		map_layer.add_child(fence)
+	rock.polygon = PackedVector2Array([Vector2(-18, 6), Vector2(-8, -12), Vector2(10, -6), Vector2(16, 8), Vector2(-2, 12)])
+	rock.color = Color(0.48, 0.44, 0.4, 0.95)
+	rock.position = Vector2(46, 268)
+	sc.add_child(rock)
+	var rock2 := Polygon2D.new()
+	rock2.polygon = PackedVector2Array([Vector2(-10, 4), Vector2(-2, -8), Vector2(12, -2), Vector2(8, 8)])
+	rock2.color = Color(0.4, 0.38, 0.34, 0.9)
+	rock2.position = Vector2(348, 300)
+	sc.add_child(rock2)
+
+	for spot in [Vector2(150, 168), Vector2(230, 176), Vector2(70, 430), Vector2(330, 450), Vector2(40, 620), Vector2(200, 630), Vector2(350, 610)]:
+		_tuft(sc, spot, Color(0.45, 0.58, 0.28, 0.9))
+		_tuft(sc, spot + Vector2(10, 4), Color(0.32, 0.46, 0.22, 0.85))
+
+	_fence_box(sc, POST_POS["pasture"])
+	_fence_box(sc, POST_POS["yard"])
+
+	var well_at: Vector2 = POST_POS["well"]
+	_disc(sc, well_at + Vector2(0, 4), 24, Color(0.55, 0.52, 0.48, 0.95))
+	_disc(sc, well_at + Vector2(0, 6), 12, Color(0.18, 0.32, 0.34, 0.95))
+	_rect(sc, well_at + Vector2(-26, -28), Vector2(6, 32), Color(0.38, 0.26, 0.14))
+	_rect(sc, well_at + Vector2(20, -28), Vector2(6, 32), Color(0.38, 0.26, 0.14))
+	var roof := Polygon2D.new()
+	roof.polygon = PackedVector2Array([
+		well_at + Vector2(-32, -24),
+		well_at + Vector2(0, -46),
+		well_at + Vector2(32, -24),
+	])
+	roof.color = Color(0.55, 0.28, 0.16, 0.95)
+	sc.add_child(roof)
+
+	_tent(sc, Vector2(78, 590), 34, 48, Color(0.62, 0.48, 0.3, 0.95))
+	_tent(sc, Vector2(330, 575), 30, 42, Color(0.5, 0.34, 0.22, 0.95))
+	_tent(sc, Vector2(300, 500), 22, 30, Color(0.55, 0.4, 0.24, 0.8))
+	_disc(sc, CAMP + Vector2(46, 36), 8, Color(0.85, 0.45, 0.16, 0.55))
+	_disc(sc, CAMP + Vector2(46, 38), 4, Color(0.95, 0.75, 0.3, 0.8))
+
+	# Foreground scrub so the camp sits in front of the field.
+	_disc(sc, Vector2(18, 648), 22, Color(0.2, 0.28, 0.14, 0.9))
+	_disc(sc, Vector2(372, 652), 24, Color(0.18, 0.26, 0.12, 0.9))
+
+
+func _sway_tufts() -> void:
+	for i in sway_nodes.size():
+		var n: Node2D = sway_nodes[i]
+		var tw := create_tween()
+		tw.set_loops()
+		var amp := 5.0 if i % 2 == 0 else -4.0
+		var dur := 1.5 + 0.12 * float(i % 5)
+		tw.tween_property(n, "rotation_degrees", amp, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(n, "rotation_degrees", -amp, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func _build_posts() -> void:
@@ -132,13 +283,23 @@ func _build_posts() -> void:
 		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		wrap.add_child(ring)
 
+		var ash := ColorRect.new()
+		ash.name = "Ash"
+		ash.set_anchors_preset(PRESET_FULL_RECT)
+		ash.color = Color(0.12, 0.07, 0.05, 0.45)
+		ash.visible = false
+		ash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		wrap.add_child(ash)
+
 		var label := Label.new()
 		label.name = "Label"
-		label.position = Vector2(-10, -22)
+		label.position = Vector2(-10, 78)
 		label.size = Vector2(116, 20)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.add_theme_font_size_override("font_size", 12)
 		label.add_theme_color_override("font_color", CREAM)
+		label.add_theme_constant_override("outline_size", 4)
+		label.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.04, 0.9))
 		label.text = "%s · Empty" % {"pasture": "North", "well": "Well", "yard": "Fold"}[pid]
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		wrap.add_child(label)
@@ -161,17 +322,28 @@ func _build_bumps() -> void:
 		"yard": Vector2(-30, 20),
 	}
 	for pid in files.keys():
-		var tr := TextureRect.new()
-		tr.name = pid
-		tr.texture = load(files[pid])
-		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tr.size = Vector2(90, 50)
-		tr.position = POST_POS[pid] + offsets[pid]
-		tr.visible = false
-		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		bumps.add_child(tr)
-		bump_nodes[pid] = tr
+		var base_pos: Vector2 = POST_POS[pid] + offsets[pid]
+		var tex: Texture2D = load(files[pid])
+		bump_nodes[pid] = _make_bump(bumps, pid, tex, base_pos, Vector2(96, 54), 0.0)
+		bump_nodes[pid + "_a"] = _make_bump(bumps, pid + "A", tex, base_pos + Vector2(-28, 12), Vector2(74, 42), -8.0)
+		bump_nodes[pid + "_b"] = _make_bump(bumps, pid + "B", tex, base_pos + Vector2(24, 16), Vector2(66, 38), 7.0)
+
+
+func _make_bump(parent: Node, node_name: String, tex: Texture2D, at: Vector2, box: Vector2, rot: float) -> TextureRect:
+	var tr := TextureRect.new()
+	tr.name = node_name
+	tr.texture = tex
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	tr.size = box
+	tr.position = at
+	tr.rotation_degrees = rot
+	tr.pivot_offset = box * 0.5
+	tr.visible = false
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(tr)
+	return tr
 
 
 func _build_workers() -> void:
@@ -189,7 +361,17 @@ func _build_workers() -> void:
 		wrap.name = id
 		wrap.size = Vector2(72, 100)
 		wrap.position = CAMP + Vector2((i - 1) * 58.0, i * 6.0)
+		wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		workers.add_child(wrap)
+
+		var glow := ColorRect.new()
+		glow.name = "BusyGlow"
+		glow.position = Vector2(-4, 8)
+		glow.size = Vector2(80, 78)
+		glow.color = Color(1.0, 0.68, 0.22, 0.42)
+		glow.visible = false
+		glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		wrap.add_child(glow)
 
 		for state in ["idle", "walk", "busy"]:
 			var tr := TextureRect.new()
@@ -211,6 +393,8 @@ func _build_workers() -> void:
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.add_theme_font_size_override("font_size", 11)
 		label.add_theme_color_override("font_color", CREAM)
+		label.add_theme_constant_override("outline_size", 4)
+		label.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.04, 0.9))
 		label.text = "%s · Idle" % GameSim.WORKER_NAMES[id]
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		wrap.add_child(label)
@@ -329,6 +513,43 @@ func _build_goal_and_tray() -> void:
 		btn.pressed.connect(func() -> void: _on_worker_pressed(captured))
 		row.add_child(btn)
 		tray_buttons[id] = btn
+
+
+func _build_neglect_banner() -> void:
+	neglect_banner = Panel.new()
+	neglect_banner.name = "NeglectBanner"
+	neglect_banner.position = Vector2(10, 452)
+	neglect_banner.size = Vector2(370, 78)
+	neglect_banner.visible = false
+	neglect_banner.z_index = 8
+	neglect_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	neglect_banner.add_theme_stylebox_override("panel", _style_flat(Color(0.32, 0.13, 0.08, 0.94), Color(0.86, 0.42, 0.24), 12, 2))
+	add_child(neglect_banner)
+
+	neglect_title = Label.new()
+	neglect_title.position = Vector2(12, 6)
+	neglect_title.size = Vector2(346, 18)
+	neglect_title.text = "NEGLECT"
+	neglect_title.add_theme_font_size_override("font_size", 12)
+	neglect_title.add_theme_color_override("font_color", Color(0.98, 0.82, 0.62))
+	neglect_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	neglect_banner.add_child(neglect_title)
+
+	neglect_detail = Label.new()
+	neglect_detail.position = Vector2(12, 24)
+	neglect_detail.size = Vector2(346, 22)
+	neglect_detail.add_theme_font_size_override("font_size", 16)
+	neglect_detail.add_theme_color_override("font_color", CREAM)
+	neglect_detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	neglect_banner.add_child(neglect_detail)
+
+	neglect_cost = Label.new()
+	neglect_cost.position = Vector2(12, 48)
+	neglect_cost.size = Vector2(346, 22)
+	neglect_cost.add_theme_font_size_override("font_size", 14)
+	neglect_cost.add_theme_color_override("font_color", Color(0.98, 0.78, 0.55))
+	neglect_cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	neglect_banner.add_child(neglect_cost)
 
 
 func _build_mission_video() -> void:
@@ -483,10 +704,7 @@ func _bind_sim() -> void:
 	GameSim.outcome_changed.connect(_on_outcome)
 	GameSim.status_message.connect(func(t: String) -> void: status_label.text = t)
 	GameSim.success_applied.connect(func(_p: String, _t: Dictionary) -> void: _refresh_posts_and_now())
-	GameSim.neglect_applied.connect(func(p: String, _t: Dictionary) -> void:
-		status_label.text = "Neglect: %s." % GameSim.POST_LABELS[p]
-		_refresh_posts_and_now()
-	)
+	GameSim.neglect_applied.connect(_on_neglect_applied)
 
 
 func _refresh_all() -> void:
@@ -499,7 +717,7 @@ func _refresh_all() -> void:
 		_place_worker(id)
 	for pid in ["pasture", "well", "yard"]:
 		_refresh_post(pid)
-		bump_nodes[pid].visible = GameSim.terrain_on[pid]
+		_set_bumps_visible(pid, GameSim.terrain_on[pid])
 	_refresh_tray()
 	if GameSim.outcome == "":
 		outcome_card.visible = false
@@ -523,15 +741,21 @@ func _on_worker_state(worker_id: String, state: String) -> void:
 	var node: Control = worker_nodes[worker_id]
 	node.get_node("Idle").visible = state == "idle"
 	node.get_node("Walk").visible = state == "walk"
+	var was_busy := bool(node.get_node("Busy").visible)
 	node.get_node("Busy").visible = state == "busy"
+	node.get_node("BusyGlow").visible = state == "busy"
 	node.get_node("Label").text = "%s · %s" % [GameSim.WORKER_NAMES[worker_id], state.capitalize()]
 	_refresh_tray()
 	if state == "idle":
 		_place_worker(worker_id)
+	elif state == "busy" and not was_busy:
+		_show_busy_hold(worker_id)
 
 
 func _place_worker(worker_id: String) -> void:
 	var node: Control = worker_nodes[worker_id]
+	node.rotation_degrees = 0.0
+	node.scale = Vector2.ONE
 	var w: Dictionary = GameSim.workers[worker_id]
 	if w["state"] == "idle":
 		var idx := GameSim.WORKER_ORDER.find(worker_id)
@@ -541,45 +765,75 @@ func _place_worker(worker_id: String) -> void:
 
 
 func _on_assignment(worker_id: String, post_id: String) -> void:
+	_end_neglect_drama()
 	_refresh_post(post_id)
 	var node: Control = worker_nodes[worker_id]
-	if walk_tweens.has(worker_id) and is_instance_valid(walk_tweens[worker_id]):
-		walk_tweens[worker_id].kill()
+	_kill_tween(worker_id)
+	_kill_tween(worker_id + "_stride")
+	node.pivot_offset = Vector2(36, 90)
 	var target: Vector2 = POST_POS[post_id] + Vector2(-28, -30)
+	var from_pos := node.position
+	var dur := GameSim.WALK_SECONDS
 	var tw := create_tween()
 	walk_tweens[worker_id] = tw
-	tw.tween_property(node, "position", target, GameSim.WALK_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	# Subtle bob
-	tw.parallel().tween_property(node, "rotation_degrees", 4.0, 0.25).set_trans(Tween.TRANS_SINE)
-	tw.chain().tween_property(node, "rotation_degrees", 0.0, 0.2)
+	tw.tween_property(node, "position", target, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_callback(func() -> void:
+		node.rotation_degrees = 0.0
+		_kill_tween(worker_id + "_stride")
 		GameSim.complete_walk(worker_id)
 	)
+	var stride := create_tween()
+	walk_tweens[worker_id + "_stride"] = stride
+	stride.set_loops(ceili(dur / 0.32))
+	stride.tween_property(node, "rotation_degrees", 7.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	stride.tween_property(node, "rotation_degrees", -5.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_spawn_walk_dust(from_pos, target)
 
 
 func _on_terrain(post_id: String) -> void:
-	var n: Control = bump_nodes[post_id]
+	_pop_bump(bump_nodes[post_id], Vector2.ONE)
+	_pop_bump(bump_nodes[post_id + "_a"], Vector2(0.92, 0.92))
+	_pop_bump(bump_nodes[post_id + "_b"], Vector2(0.8, 0.8))
+
+
+func _pop_bump(n: Control, target: Vector2) -> void:
 	n.visible = true
-	n.scale = Vector2(0.55, 0.55)
+	n.pivot_offset = n.size * 0.5
+	n.scale = target * 0.4
 	var tw := create_tween()
-	tw.tween_property(n, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK)
+	tw.tween_property(n, "scale", target, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _refresh_post(post_id: String) -> void:
 	var node: Control = post_nodes[post_id]
-	var staffed := false
-	for id in GameSim.WORKER_ORDER:
-		var w: Dictionary = GameSim.workers[id]
-		if w["post"] == post_id and w["state"] in ["walk", "busy"]:
-			staffed = true
-			break
-	var done_today := post_id in GameSim.successes_today
 	var ring: Panel = node.get_node("Ring")
 	var label: Label = node.get_node("Label")
+	var ash: ColorRect = node.get_node("Ash")
 	var short: String = {"pasture": "North", "well": "Well", "yard": "Fold"}[post_id]
-	if staffed or done_today:
+	if neglect_drama_post == post_id:
+		ash.visible = true
+		ring.add_theme_stylebox_override("panel", _style_flat(Color(0.28, 0.12, 0.08, 0.62), Color(0.72, 0.24, 0.14), 48, 4))
+		label.text = "%s · Neglected" % short
+		return
+	ash.visible = false
+	node.modulate = Color.WHITE
+	if node.scale != Vector2.ONE and neglect_drama_post == "":
+		node.scale = Vector2.ONE
+	var walking := false
+	var busied := false
+	for id in GameSim.WORKER_ORDER:
+		var w: Dictionary = GameSim.workers[id]
+		if w["post"] == post_id and w["state"] == "walk":
+			walking = true
+		elif w["post"] == post_id and w["state"] == "busy":
+			busied = true
+	var done_today := post_id in GameSim.successes_today
+	if busied or done_today:
 		ring.add_theme_stylebox_override("panel", _style_flat(Color(0.77, 0.42, 0.23, 0.28), TERRACOTTA, 48, 3))
 		label.text = "%s · Busy" % short
+	elif walking:
+		ring.add_theme_stylebox_override("panel", _style_flat(Color(0.85, 0.62, 0.32, 0.18), Color(0.93, 0.78, 0.48), 48, 2))
+		label.text = "%s · Walk" % short
 	else:
 		ring.add_theme_stylebox_override("panel", _style_flat(Color(0.97, 0.94, 0.89, 0.12), Color(0.97, 0.94, 0.89, 0.9), 48, 2))
 		label.text = "%s · Empty" % short
@@ -619,7 +873,7 @@ func _on_mission_video(post_id: String, lesson: String) -> void:
 	mission_video.visible = true
 	mission_video.modulate.a = 0.0
 	var tw := create_tween()
-	tw.tween_property(mission_video, "modulate:a", 1.0, 0.25)
+	tw.tween_property(mission_video, "modulate:a", 1.0, 0.35)
 
 
 func _on_mission_continue() -> void:
@@ -652,8 +906,143 @@ func _show_outcome(kind: String, title: String, tip: String) -> void:
 	outcome_card.visible = true
 
 
+func _set_bumps_visible(post_id: String, on: bool) -> void:
+	for key in [post_id, post_id + "_a", post_id + "_b"]:
+		var n: CanvasItem = bump_nodes[key]
+		n.visible = on
+
+
+func _kill_tween(key: String) -> void:
+	if not walk_tweens.has(key):
+		return
+	var tw: Tween = walk_tweens[key]
+	if tw and is_instance_valid(tw):
+		tw.kill()
+	walk_tweens.erase(key)
+
+
+func _spawn_walk_dust(from_pos: Vector2, to_pos: Vector2) -> void:
+	var dust := ColorRect.new()
+	dust.size = Vector2(18, 6)
+	dust.color = Color(0.93, 0.86, 0.68, 0.8)
+	dust.position = from_pos + Vector2(27, 78)
+	dust.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	map_layer.add_child(dust)
+	var tw := create_tween()
+	tw.tween_property(dust, "position", to_pos + Vector2(22, 74), GameSim.WALK_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.parallel().tween_property(dust, "modulate:a", 0.05, GameSim.WALK_SECONDS)
+	tw.tween_callback(dust.queue_free)
+
+
+func _show_busy_hold(worker_id: String) -> void:
+	var node: Control = worker_nodes[worker_id]
+	node.pivot_offset = Vector2(36, 78)
+	node.rotation_degrees = 0.0
+	var glow: ColorRect = node.get_node("BusyGlow")
+	glow.visible = true
+	glow.modulate.a = 0.0
+	var tw := create_tween()
+	tw.tween_property(node, "scale", Vector2(1.06, 1.06), 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(glow, "modulate:a", 1.0, 0.16)
+	tw.tween_interval(maxf(0.2, GameSim.BUSY_HOLD_SECONDS - 0.34))
+	tw.tween_property(node, "scale", Vector2.ONE, 0.14)
+	tw.parallel().tween_property(glow, "modulate:a", 0.45, 0.14)
+
+
+## Presentation only. Costs are read from GameSim.NEGLECT; this does not apply deltas.
+func _neglect_cost_line(post_id: String) -> String:
+	var delta: Dictionary = GameSim.NEGLECT[post_id]
+	var parts: PackedStringArray = []
+	var names := {"heads": "Heads", "health": "Health", "trust": "Trust", "stores": "Stores"}
+	for key in ["heads", "health", "trust", "stores"]:
+		var n := int(delta[key])
+		if n == 0:
+			continue
+		parts.append("%s %d" % [names[key], n])
+	return " · ".join(parts)
+
+
+func _on_neglect_applied(post_id: String, _truths: Dictionary) -> void:
+	neglect_serial += 1
+	neglect_drama_post = post_id
+	var serial := neglect_serial
+	call_deferred("_present_neglect", post_id, serial)
+
+
+func _present_neglect(post_id: String, serial: int) -> void:
+	if serial != neglect_serial:
+		return
+	var place: String = GameSim.POST_LABELS[post_id]
+	var cost := _neglect_cost_line(post_id)
+	neglect_detail.text = "%s untended" % place
+	neglect_cost.text = cost
+	neglect_banner.modulate.a = 1.0
+	neglect_banner.visible = true
+	status_label.text = "Neglect: %s — %s" % [place, cost]
+	_refresh_post(post_id)
+	_pulse_neglected(post_id)
+	await get_tree().create_timer(3.4).timeout
+	if serial != neglect_serial:
+		return
+	if neglect_pulse and is_instance_valid(neglect_pulse):
+		neglect_pulse.kill()
+	_hide_neglect_banner()
+	if neglect_drama_post == post_id:
+		neglect_drama_post = ""
+		var node: Control = post_nodes[post_id]
+		node.modulate = Color.WHITE
+		node.scale = Vector2.ONE
+		_refresh_post(post_id)
+
+
+func _pulse_neglected(post_id: String) -> void:
+	var node: Control = post_nodes[post_id]
+	node.pivot_offset = node.size * 0.5
+	if neglect_pulse and is_instance_valid(neglect_pulse):
+		neglect_pulse.kill()
+	var tw := create_tween()
+	neglect_pulse = tw
+	tw.set_loops(4)
+	tw.tween_property(node, "scale", Vector2(1.08, 1.08), 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.parallel().tween_property(node, "modulate", Color(1.15, 0.7, 0.48), 0.28)
+	tw.tween_property(node, "scale", Vector2(0.96, 0.96), 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.parallel().tween_property(node, "modulate", Color(0.52, 0.42, 0.38), 0.28)
+
+
+func _hide_neglect_banner() -> void:
+	if neglect_banner == null or not neglect_banner.visible:
+		return
+	var tw := create_tween()
+	tw.tween_property(neglect_banner, "modulate:a", 0.0, 0.35)
+	tw.tween_callback(func() -> void:
+		neglect_banner.visible = false
+		neglect_banner.modulate.a = 1.0
+	)
+
+
+func _end_neglect_drama() -> void:
+	neglect_serial += 1
+	var post := neglect_drama_post
+	neglect_drama_post = ""
+	if neglect_pulse and is_instance_valid(neglect_pulse):
+		neglect_pulse.kill()
+	neglect_pulse = null
+	if neglect_banner:
+		neglect_banner.visible = false
+		neglect_banner.modulate.a = 1.0
+	if post != "" and post_nodes.has(post):
+		var node: Control = post_nodes[post]
+		node.modulate = Color.WHITE
+		node.scale = Vector2.ONE
+		_refresh_post(post)
+
+
 func _on_restart() -> void:
 	outcome_card.visible = false
 	mission_video.visible = false
+	_end_neglect_drama()
+	for key in walk_tweens.keys():
+		_kill_tween(String(key))
+	walk_tweens.clear()
 	GameSim.restart_fold()
 	_refresh_all()

@@ -45,8 +45,8 @@ Spacing: chrome compact; map breathes; goal chip always visible; tray ≥44px ta
 | State | Read | Timing |
 |-------|------|--------|
 | **Idle** | Camp stance, crook upright, feet planted | Default at camp huddle |
-| **Walk** | Stride + lean, crook angled, optional motion ticks | **~1s** transit camp → post |
-| **Busy** | At post, work pose, warm spark/glow | **Must be visible before MissionVideo** |
+| **Walk** | Stride + lean, crook angled, optional motion ticks | **~1.8s** transit camp → post (readable; not a click-cut) |
+| **Busy** | At post, work pose, warm spark/glow | **~0.85s on the map before MissionVideo** |
 
 Tint: Eliab `#3d6b66` · Micah `#c46a3a` · Tamar `#8a6b3a`. Same silhouette sheet; color only. See `worker-states-sheet.png`.
 
